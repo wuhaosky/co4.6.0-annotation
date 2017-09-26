@@ -52,8 +52,7 @@ function co(gen) {
     if (typeof gen === 'function') gen = gen.apply(ctx, args);      // 执行构造器函数，并将构造器函数的this指向ctx，返回遍历器对象。现在的gen不再是构造器函数，而是遍历器对象。
     if (!gen || typeof gen.next !== 'function') return resolve(gen);
 
-    onFulfilled();  // 遍历器对象执行第一次next方法，无参数值
-
+    onFulfilled();  // 遍历器对象执行第一次next方法
     /** 遍历器对象自动执行next方法的实现
      * @param {Mixed} res
      * @return {Promise}
