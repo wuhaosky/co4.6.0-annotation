@@ -91,6 +91,7 @@ function co(gen) {
     /**
      * Get the next value in the generator,
      * return a promise.
+     * co自动执行的核心实现
      * 将yield后面跟的表达式都包裹为promise，并执行这个promise，
      * 当这个promise状态变为fulfill时执行onFulfilled函数，
      * 并传入resolve的值，于是遍历器就会自动执行
