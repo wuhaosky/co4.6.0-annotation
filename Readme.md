@@ -1,212 +1,42 @@
-# co
+# co源码解析
 
-[![Gitter][gitter-image]][gitter-url]
-[![NPM version][npm-image]][npm-url]
-[![Build status][travis-image]][travis-url]
-[![Test coverage][coveralls-image]][coveralls-url]
-[![Downloads][downloads-image]][downloads-url]
+## co的作用：
+* 把generator包装成promise
+* 实现generator的自动执行。自动使用同步的方式执行异步代码。
+* 把yield后promise的resolve值赋值给yield左边的变量。并把generator里return的值传给promise的then回调里。
 
-  Generator based control flow goodness for nodejs and the browser,
-  using promises, letting you write non-blocking code in a nice-ish way.
 
-## Co v4
+## co的原理：
+* 从外部看，co把generator包裹成一个promise，当generator执行完成时，也就是这个promise变成fulfill状态，会执行这个promise的then回调，并把generator里的return的值传入这个then回调。
+* 从内部看，co把generator中yield后面的表达式都包裹成promise。在promise的then回调里，执行下一个promise(也就是下一个yield)，直至所有的promise执行完。
 
-  `co@4.0.0` has been released, which now relies on promises.
-  It is a stepping stone towards the [async/await proposal](https://github.com/lukehoban/ecmascript-asyncawait).
-  The primary API change is how `co()` is invoked.
-  Before, `co` returned a "thunk", which you then called with a callback and optional arguments.
-  Now, `co()` returns a promise.
 
-```js
-co(function* () {
-  var result = yield Promise.resolve(true);
-  return result;
-}).then(function (value) {
-  console.log(value);
-}, function (err) {
-  console.error(err.stack);
-});
-```
+## co包裹的generator里，有表达式是generator的情况
+* 如果yield后面是一个generator，则前面既可以使用yield，也可以使用yield*。并且，这个generator里yield后面的表达式，必须是函数、promise、生成器、遍历器对象、数组、对象之一。
+* 如果使用yield，则后面既可以是生成器函数，也可以是遍历器对象，在toPromise的环节，co会递归处理这个generator；
+* 如果使用yield*，则后面跟着的只能是遍历器对象，co会把这个generator里的yield展开，拉平处理。
 
-  If you want to convert a `co`-generator-function into a regular function that returns a promise,
-  you now use `co.wrap(fn*)`.
 
-```js
-var fn = co.wrap(function* (val) {
-  return yield Promise.resolve(val);
-});
+## co和co.wrap的使用场景
+* co是立即执行，无参数；
+* co.wrap是将生成器包裹成返回promise的函数，调用这个函数才执行，并且这个函数是可以传参的。
 
-fn(true).then(function (val) {
 
-});
-```
+## co把generator转成promise后，当fulfill时，传入then回调里的值是哪来的？
+* 从使用者的角度看，在generator里return的值，就是then回调里传入的值；
+* 从内部实现看，遍历器对象最后一次next返回对象的Value字段的值是generator最后return的值，也是then回调里传入的值。
 
-## Platform Compatibility
 
-  `co@4+` requires a `Promise` implementation.
-  For versions of node `< 0.11` and for many older browsers,
-  you should/must include your own `Promise` polyfill.
+## co包裹的generator中的yield后面跟的表达式必须是promise、function、生成器、遍历器对象、数组、对象之一
 
-  When using node 0.10.x and lower or browsers without generator support,
-  you must use [gnode](https://github.com/TooTallNate/gnode) and/or [regenerator](http://facebook.github.io/regenerator/).
 
-  When using node 0.11.x, you must use the `--harmony-generators`
-  flag or just `--harmony` to get access to generators.
+## yield后的表达式执行完成后，如何把结果赋值给左边的变量？
+* 首先，yield表达式是没有返回值的，或者说它的返回值是undefined。
+* co将yield后的promise resolve的值，在下一次调用next时，传入next中，遍历器把本次next传入的值作为上次yield的返回值。
 
-  Node v4+ is supported out of the box, you can use `co` without flags or polyfills.
 
-## Installation
-
-```
-$ npm install co
-```
-
-## Associated libraries
-
-Any library that returns promises work well with `co`.
-
-- [mz](https://github.com/normalize/mz) - wrap all of node's code libraries as promises.
-
-View the [wiki](https://github.com/visionmedia/co/wiki) for more libraries.
-
-## Examples
-
-```js
-var co = require('co');
-
-co(function *(){
-  // yield any promise
-  var result = yield Promise.resolve(true);
-}).catch(onerror);
-
-co(function *(){
-  // resolve multiple promises in parallel
-  var a = Promise.resolve(1);
-  var b = Promise.resolve(2);
-  var c = Promise.resolve(3);
-  var res = yield [a, b, c];
-  console.log(res);
-  // => [1, 2, 3]
-}).catch(onerror);
-
-// errors can be try/catched
-co(function *(){
-  try {
-    yield Promise.reject(new Error('boom'));
-  } catch (err) {
-    console.error(err.message); // "boom"
- }
-}).catch(onerror);
-
-function onerror(err) {
-  // log any uncaught errors
-  // co will not throw any errors you do not handle!!!
-  // HANDLE ALL YOUR ERRORS!!!
-  console.error(err.stack);
-}
-```
-
-## Yieldables
-
-  The `yieldable` objects currently supported are:
-
-  - promises
-  - thunks (functions)
-  - array (parallel execution)
-  - objects (parallel execution)
-  - generators (delegation)
-  - generator functions (delegation)
-
-Nested `yieldable` objects are supported, meaning you can nest
-promises within objects within arrays, and so on!
-
-### Promises
-
-[Read more on promises!](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
-
-### Thunks
-
-Thunks are functions that only have a single argument, a callback.
-Thunk support only remains for backwards compatibility and may
-be removed in future versions of `co`.
-
-### Arrays
-
-`yield`ing an array will resolve all the `yieldables` in parallel.
-
-```js
-co(function* () {
-  var res = yield [
-    Promise.resolve(1),
-    Promise.resolve(2),
-    Promise.resolve(3),
-  ];
-  console.log(res); // => [1, 2, 3]
-}).catch(onerror);
-```
-
-### Objects
-
-Just like arrays, objects resolve all `yieldable`s in parallel.
-
-```js
-co(function* () {
-  var res = yield {
-    1: Promise.resolve(1),
-    2: Promise.resolve(2),
-  };
-  console.log(res); // => { 1: 1, 2: 2 }
-}).catch(onerror);
-```
-
-### Generators and Generator Functions
-
-Any generator or generator function you can pass into `co`
-can be yielded as well. This should generally be avoided
-as we should be moving towards spec-compliant `Promise`s instead.
-
-## API
-
-### co(fn*).then( val => )
-
-Returns a promise that resolves a generator, generator function,
-or any function that returns a generator.
-
-```js
-co(function* () {
-  return yield Promise.resolve(true);
-}).then(function (val) {
-  console.log(val);
-}, function (err) {
-  console.error(err.stack);
-});
-```
-
-### var fn = co.wrap(fn*)
-
-Convert a generator into a regular function that returns a `Promise`.
-
-```js
-var fn = co.wrap(function* (val) {
-  return yield Promise.resolve(val);
-});
-
-fn(true).then(function (val) {
-
-});
-```
-
-## License
-
-  MIT
-
-[npm-image]: https://img.shields.io/npm/v/co.svg?style=flat-square
-[npm-url]: https://npmjs.org/package/co
-[travis-image]: https://img.shields.io/travis/tj/co.svg?style=flat-square
-[travis-url]: https://travis-ci.org/tj/co
-[coveralls-image]: https://img.shields.io/coveralls/tj/co.svg?style=flat-square
-[coveralls-url]: https://coveralls.io/r/tj/co
-[downloads-image]: http://img.shields.io/npm/dm/co.svg?style=flat-square
-[downloads-url]: https://npmjs.org/package/co
-[gitter-image]: https://badges.gitter.im/Join%20Chat.svg
-[gitter-url]: https://gitter.im/tj/co?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+## co错误处理机制
+参考：http://taobaofed.org/blog/2016/03/18/error-handling-in-koa/
+* 遍历器对象throw方法，可以在外部抛出，在生成器内部捕获。
+* 如果co包裹的generator内部有try catch，则co内部发生错误时，会被这个try catch捕获；
+* 如果generator内部没有try catch，则co包裹成的promise变为rejected状态，执行co的catch回调。
