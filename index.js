@@ -64,7 +64,7 @@ function co(gen) {
       try {
         ret = gen.next(res);  // 遍历器对象执行next方法，返回一个对象，形如{done: Boolean, value: yield后面的表达式}
       } catch (e) {
-        return reject(e);
+        return reject(e);     // co转成的promise变为rejected状态，执行promise的catch方法，并将e传入
       }
       next(ret);              // 将yield后面跟的表达式都包裹为promise，并执行这个promise，
                               // 当这个promise状态变为fulfill时执行onFulfilled函数，
@@ -81,9 +81,9 @@ function co(gen) {
     function onRejected(err) {
       var ret;
       try {
-        ret = gen.throw(err);
-      } catch (e) {
-        return reject(e);
+        ret = gen.throw(err); // 遍历器对象throw方法，可以在外部抛出，在生成器内部捕获。        
+      } catch (e) {           // 如果生成器内部，没有try catch则被外部的try catch捕获
+        return reject(e);     // co转成的promise变为rejected状态，执行promise的catch方法，并将e传入
       }
       next(ret);
     }
