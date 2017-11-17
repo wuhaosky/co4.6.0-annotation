@@ -14,13 +14,16 @@
 ## co包裹的generator里，有表达式是generator的情况
 * 如果yield后面是一个generator，则前面既可以使用yield，也可以使用yield*。并且，这个generator里yield后面的表达式，必须是函数、promise、生成器、遍历器对象、数组、对象之一。
 * 如果使用yield，则后面既可以是生成器函数，也可以是遍历器对象，在toPromise的环节，co会递归处理这个generator；
-* 如果使用yield*，则后面跟着的只能是遍历器对象，co会把这个generator里的yield展开，拉平处理。
+* 如果使用yield*，则后面跟着的只能是遍历器对象，generator自身特性会把yield*后面跟着的generator里的yield展开，co会把展开的yield和其它yield平行处理。
 
 
 ## co和co.wrap的使用场景
 * co是立即执行，无参数；
 * co.wrap是将生成器包裹成返回promise的函数，调用这个函数才执行，并且这个函数是可以传参的。
 
+## yield后面的表达式是对象或数组的使用场景
+* 并发执行对象或数组里面的promise
+* 其实这种并发的实现，co也是基于promise.all()的。
 
 ## co把generator转成promise后，当fulfill时，传入then回调里的值是哪来的？
 * 从使用者的角度看，在generator里return的值，就是then回调里传入的值；
