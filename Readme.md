@@ -40,6 +40,7 @@
 
 ## co错误处理机制
 参考：http://taobaofed.org/blog/2016/03/18/error-handling-in-koa/
-* 遍历器对象throw方法，可以在外部抛出，在生成器内部捕获。
+* 遍历器对象throw方法，可以在外部抛出，在生成器内部捕获；
 * 如果co包裹的generator内部有try catch，则co内部发生错误时，会被这个try catch捕获；
+* generator里有几个yield，为避免某一个yield后的promise rejected，不影响到主流程的执行，可以对每一个yield的执行过程try catch；
 * 如果generator内部没有try catch，则co包裹成的promise变为rejected状态，执行co的catch回调。
